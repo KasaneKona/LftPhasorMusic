@@ -1,0 +1,117 @@
+include demo.i
+		.global	main
+		.global unpack
+		.global wait
+		.global loadcopper
+main:
+		r3 = 0
+		Z = pokelist
+		r27 = 0
+1:
+		r26 = progmem[Z++]
+		r16 = progmem[Z++]
+		ram[X] = r16
+		if(r30 != lo8(pokelist_end)) goto main.1
+		X = 0x0100
+2:
+		r16 = progmem[Z++]
+		ram[X++] = r16
+		if(r26 != 4) goto main.2
+3:
+		file[X++] = r3
+        if(r27 != 5) goto main.3
+		r12 = r2
+		r13 = 0 // r13 ^= r13
+		// Prepare for quilt
+		r14 = r2
+		r15 = 0 // r15 ^= r15
+		// data[scratch+0] = r3
+		r16 = 7
+		data[scratch+1] = r16
+		util.blank()
+		enableInterrupts()
+
+runstory:
+		Y = story
+		r25 = 0
+1:
+		if(song_end) goto runstory.1
+		unpack.ophuffman()
+		r30 = r16
+		r30 &= 0x1f
+		r30 -= 0x80
+		r16 &= 0x60
+		if(r16 != 0) goto runstory.2
+		// Call
+		r31 = hi8(location(jumptable))
+		call(Z)
+		goto runstory.1
+2:
+		if(r16.bit(5)) data[mainvector] = r30
+		if(r16.bit(6)) data[vblvector] = r30
+		goto runstory.1
+
+unpack:
+		stack.push(r25)
+		stack.push(r28)
+		stack.push(r29)
+        // Set Y
+		r28 = data[gfxptr]
+		r29 = data[gfxptr+1]
+		r25 = data[gfxbits]
+		unpack.unpackpic()
+		data[gfxptr] = r28
+		data[gfxptr+1] = r29
+		data[gfxbits] = r25
+popret:
+		stack.pop(r29)
+		stack.pop(r28)
+		stack.pop(r25)
+		return
+wait:
+        unpack.ophuffman()
+		stack.push(r25)
+		stack.push(r28)
+		stack.push(r29)
+		r18 = data[storywait]
+		r19 = data[storywait+1]
+		r16 <<= 1
+        // 16bit add
+		r18 += r16
+		r19 += r3 + carryBit
+		r18 += r16
+		r19 += r3 + carryBit
+		data[storywait] = r18
+		data[storywait+1] = r19
+1:
+		util.waitvbl()
+		Y = scratch
+        // Set Z
+		r30 = data[mainvector]
+		r31 = hi8(location(jumptable))
+		call(Z)
+		r20 = io.GPIOR1
+		r21 = io.GPIOR2
+		r16 = data[storywait]
+		r17 = data[storywait+1]
+        // 16bit compare
+		compare(r20, r16)
+		if(r21 - r17 - carryBit < 0) goto wait.1
+		goto popret
+loadcopper:
+		util.blankfield() // prevent race condition with video interrupt
+		r16 = 0x77 // 0xAA - 0x33
+		data[coppertime+cl_flash] = r16
+        unpack.ophuffman()
+		r19 += r16 // r19 points to field
+		unpack.ophuffman()
+		r18 = r16
+		X = coppertime
+1:
+		unpack.ophuffman()
+		r16 <<= 1
+		file[X++] = r16
+		r18--
+		if(r18 != 0) goto loadcopper.1
+		data[copperfield] = r19
+		return

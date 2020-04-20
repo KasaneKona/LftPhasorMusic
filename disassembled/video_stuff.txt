@@ -1,0 +1,30 @@
+x = 0.000012*17734470
+
+Image starts roughly 213 cycles into line
+0 -> 71 hsync
+71 -> 213 back porch
+131 -> 1039 effect active
+1040 -> 1135 (should be blank)
+
+Rowmap:
+  0: s2  s2
+  1: s2  s2
+  2: s2  s2
+  3: s30 s30
+  4: s30 s30
+  5: s30 s2
+  6: s2  s2
+  7: s2  s2
+  8: blk blk
+...
+ 37: blk blk
+ 38: vid vid
+...
+293: vid vid
+294: blk blk
+...
+311: blk blk
+
+In story:
+copper = run effect and display for 0-127 linepairs
+hint = run effect, zero height

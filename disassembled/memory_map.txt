@@ -1,0 +1,2 @@
+0x0100 graphics pointer
+0x0102 song pointer

@@ -1,0 +1,100 @@
+Numbers given in decimal except for command values.
+Actual song data uses 2-digit hexadecimal eg. FF.
+
+Sound channels:
+  Channel 1 = triangle wave
+    Duty cycle value is unused here
+  Channel 2 = pulse wave with low-pass filter
+    Filter cutoff is channel 1 duty cycle
+  Channel 3 = pulse wave (raw)
+  Channel 4 = noise pseudo-channel
+    Fixed frequency, same as output sample frequency
+    Controlled via instrument commands, does not have its own song track
+	Volume is the sum of noise volumes set by instruments in the 3 other channels
+
+Song line = sl linenum c1track c1trans c2track c2trans c3track c3trans
+  Parameters:
+    linenum = song line number [0, 255]
+    c1track = channel 1 track [0, 95]
+    c1trans = channel 1 transpose [-16, 15] (signed 8 bit)
+    c2track = channel 2 track as above
+    c2trans = channel 2 transpose as above
+    c3track = channel 3 track as above
+    c3trans = channel 3 transpose as above
+  
+Track line = tl trknum linenum noteval instnum
+  Track length is 24
+  Parameters:
+    trknum  = track number [0, 95]
+    linenum = track line number [0, 23]
+    noteval = note value (see below) [0, 63]
+    instnum = instrument number [0, 31]
+  Event rules:
+    If instnum == 0 and noteval == 0, empty event, do nothing
+    If instnum == 0 and noteval != 0, trigger last stored instrument with new note
+    If instnum != 0 and noteval == 0, trigger new instrument with note unchanged
+    If instnum != 0 and noteval != 0, trigger new instrument with new note, store instrument
+  Event defaults:
+	Volume default 48 on instrument load
+    Vibrato rate default 15 on instrument load
+    All other note parameters default 0
+  Note table:
+      |x0 |x1 |x2 |x3 |x4 |x5 |x6 |x7 |x8 |x9 |xA |xB |xC |xD |xE |xF 
+    --+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---
+    0x|   |C-2|C#2|D-2|D#2|E-2|F-2|F#2|G-2|G#2|A-2|A#2|B-2|C-3|C#3|D-3
+    --+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---
+    1x|D#3|E-3|F-3|F#3|G-3|G#3|A-3|A#3|B-3|C-4|C#4|D-4|D#4|E-4|F-4|F#4
+    --+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---
+    2x|G-4|G#4|A-4|A#4|B-4|C-5|C#5|D-5|D#5|E-5|F-5|F#5|G-5|G#5|A-5|A#5
+    --+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---
+    3x|B-5|C-6|C#6|D-6|D#6|E-6|F-6|F#6|G-6|G#6|A-6|A#6|B-6|C-7|C#7|D-7
+	
+Instrument line = il instnum linenum command
+  Parameters:
+    instnum = instrument number [0, 31]
+	linenum = instrument line number [0, 63]
+	command = instrument commmand (see below) [0, 255]
+  Instruments should be end-padded with command 00 (Jump to instrument 0) unless ending with a jump command
+  instnum 0 reserved, always overwritten with commands 4F,00 (Wait 15 frames, jump to self)
+
+Instrument commands:
+  High nybble = command type identifier
+  Low nybble = parameter/value
+  Command list:
+    0v: Jump to (first line of) instrument v
+	  (limits jumpable/looping instruments to 1-15 so put arps there!)
+    1v: Set duty cycle to v/16
+    2v: Set instrument volume to v/16
+    3v: Set channel noise volume to v/16
+    4v: Pause for v frames after this command
+    5v: Set vibrato depth to approx. v/4 semitones
+    6v: Set vibrato speed to v/256 cycles per frame
+    7v: ILLEGAL/UNUSED - Set note low-byte to 0v
+    8v: Relative set note +v semitones
+    9v: Relative set note -v semitones
+    Av: Relative set glide +v/16 semitones per frame
+    Bv: Relative set glide -v/16 semitones per frame
+    Cv: Relative set fade rate approx +v/64 volume per frame
+    Dv: Relative set fade rate approx -v/64 volume per frame
+    Ev: Relative set duty modulation rate +v/256 widths per frame
+	  When duty cycle rises to 244 or above it wraps through 12 to reduce the silent time.
+    Fv: Relative set duty modulation rate -v/256 widths per frame
+      Also when falling below zero, wraps to 23, so don't let absolute value become negative.
+
+Human-readable command format for composing music manually or designing a tracker:
+  0v(JumpI:v) or ..(........) if after another JumpI command
+  1v(SetPW:v)
+  2v(SetIV:v)
+  3v(SetNV:v)
+  4v(Delay:v)
+  5v(VibDp:v)
+  6v(VibSp:v)
+  7v(?CMD7:v)
+  8v(Note+:v)
+  9v(Note-:v)
+  Av(Glid+:v)
+  Bv(Glid-:v)
+  Cv(Fade+:v)
+  Dv(Fade-:v)
+  Ev(PMod+:v)
+  Fv(PMod-:v)

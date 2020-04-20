@@ -1,0 +1,250 @@
+include demo.i
+        .global    playroutine
+        .global    loadinstr
+playroutine:
+        if(song_end) goto play_sound
+        r16 = tracktimer
+        r16--
+        if(r16<0) goto playroutine.1
+        goto play_nonewline
+1:
+        r16 = trackpos
+        r16--
+        if(r16<0) goto playroutine.2
+        goto play_nonewpos
+2:
+        // new song position
+        X = ch.ptr // loop through channels with X as channel pointer
+play_songch:
+        Y = songptr
+        r25 = songbits
+        unpack.ophuffman()
+        r17 = 0
+        if(r16 < 96) goto play_songch.2
+        r16 -= 112
+        if(r16 != 0) goto play_songch.1
+        song_end = true
+        goto play_sound
+1:
+        r17 = r16
+        unpack.ophuffman()
+2:
+        // r16 is track number, r17 is transpose
+        songptr = Y
+        songbits = r25
+        Z = tracks.ptr
+        r16 <<= 1
+        Z += r16
+        Y = X
+        r18 = progmem[Z++]
+        r19 = progmem[Z]
+        data[Y+c_tptr] = r19:r18
+        data[Y+c_tbits] = 0
+        data[Y+c_transp] = r17
+        X += c_sz 
+        if (X != ch.ptr+3*c_sz) goto play_songch
+        r16 = 23 // tracklen
+play_nonewpos:
+        trackpos = r16
+        // new track line
+        X = lo8(ch.ptr) // loop through channels with X as channel pointer
+play_linech:
+        Z = X
+        Y = data[Z+c_tptr]
+        r25 = data[Z+c_tbits]
+        unpack.ophuffman() ## note = 0iiiii10
+        r17 = 0 ## inst = 0
+        carry = r16 & 1
+        r16 >>= 1 ## note = 00iiiii1
+        if(carry) goto play_linech.3 ## false
+        carry = r16 & 1
+        r16 >>= 1 ## note = 000iiiii
+        if(carry) goto play_linech.2 ## true
+        // end of track
+        Y = endtrack
+        r25 = 0
+        r16 = 0
+        goto play_linech.3
+2:
+        r17 = r16 ## inst = 000iiiii
+        unpack.ophuffman() ## note = 0nnnnnn1
+        r16 >>= 1 ## note = 00nnnnnn
+3:
+        // r16 is note, r17 is instr ## note = 00nnnnnn, inst = 000iiiii
+        Z = X
+        data[Z+c_tptr] = Y
+        data[Z+c_tbits] = r25
+        Y = X
+        if(r17 == 0) goto play_noinstr
+        loadinstr()
+        if(r16 == 0) goto play_nonote
+        data[Y+c_lasti] = r17 // Record last instrument value
+play_noinstr:
+        if(r16 == 0) goto play_nonote
+        r17 = data[Y+c_transp]
+        r16 += r17
+        r16--
+        r17 = data[Y+c_lasti]
+        loadinstr()
+        data[Y+c_note+1] = r16
+        data[Y+c_note] = 0
+        data[Y+c_glide] = 0
+        data[Y+c_fade] = 0
+        data[Y+c_pwd] = 0
+        data[Y+c_vdepth] = 0
+        data[Y+c_ivol] = 48
+        data[Y+c_vrate] = 15
+play_nonote:
+        X += c_sz
+        if(r26 != ch.ptr+3*c_sz) goto play_linech
+        r16 = 3 // tempo
+play_nonewline:
+        tracktimer = r16
+play_sound:
+        Y = ch.ptr // loop through channels with Y as channel pointer
+        r24 = 0 // total noise volume
+play_ch:
+        r16 = data[Y+c_itime] // waiting?
+        r16--
+        if(r16>=0) goto play_idone
+        r16 = data[Y+c_iptr]
+        Z = instruments.ptr
+        Z += r16
+        r17 = progmem[Z]
+        r16++
+        data[Y+c_iptr] = r16
+        Z = Y
+        r16 = r17
+        r17 &= 0x0f
+        r16 &= 0xf0
+        // r16 is command, r17 is param
+        if(r16 < 0) goto play_ch.1
+        if(r16 != 0) goto play_ch.4
+        loadinstr()
+        goto play_ch
+4:
+        if(r16 != 0x10) goto play_ch.5
+        r17.swapNybbles()
+        goto play_ch.6
+5:
+        if(r16 != 0x20) goto play_ch.6
+        r17 <<= 2
+6:
+        r16.swapNybbles()
+        Z += r16
+        data[Z] = r17
+        goto play_ch
+1:
+        r16.swapNybbles()
+        carry = r16 & 1
+        r16 >>= 1
+        if(!carry) goto play_ch.2
+        r17 = -r17
+2:
+        Z = r16
+        r16 = data[Z+c_note-3]
+        r16 += r17
+        data[Z+c_note-3] = r16
+        goto play_ch
+play_idone:
+        data[Y+c_itime] = r16
+        r19:r18 = data[Y+c_note] // here's our note value in 8.8 format
+        r30 = data[Y+c_vpos]
+        // r31 = hi8(sine.ptr)
+        // r17 = progmem[Z]
+        r17 = sin8(vibrpos)
+        r16 = data[Y+c_vdepth]
+        r1:r0 = r17 * r16 // r1:r0 is wanted vibrato offset times 2 
+        r1:r0 >>= 1
+        r19:r18 += r1:r0 // update note
+        r16 = data[Y+c_vrate]
+        Z += r16*2
+        data[Y+c_vpos] = Z
+        r16 = 6 // number of octaves to shift
+6:
+        r16--
+        r19 -= 12
+        if(r19 >= 0) goto play_idone.6
+        r19 -= 244 // 256 - 12
+        Z = freq.ptr
+        r19 <<= 1
+        Z += r19
+        r20 = progmem[Z++] // r21:r20 is freq
+        r21 = progmem[Z++]
+        r22 = progmem[Z++]
+        r23 = progmem[Z++]
+        r23:r22 -= r21:r20 // r23:r22 is dist
+8:
+        r16--
+        if(r16<0) goto play_idone.9
+        r21:r20 >>= 1
+        r23:r22 >>= 1
+        goto play_idone.8
+9:
+        // Now we want to compute freq += (dist * lo(note)) >> 8.
+        // The offset to add to freq will be stored in r19:r18.
+        r17:r16 = r23:r22 * r18
+        r21:r20 += r17:r16
+        r19:r18 = data[Y+c_note] // here's our note value in 8.8 format
+        r16 = data[Y+c_glide]
+        r1:r0 = r16 * 16
+        r19:r18 += r1:r0
+        if(r1:r0 > 0) goto play_idone.1
+        r19:r18 = 0
+1:
+        std    Y+c_note, r18
+        std    Y+c_note+1, r19
+
+        ldd    r16, Y+c_ivol
+        ldd    r17, Y+c_fade
+        add    r16, r17
+        sbrc    r16, 7
+        ldi    r16, 0
+        sbrc    r16, 6
+        ldi    r16, 63
+        std    Y+c_ivol, r16
+
+        ldd    r17, Y+c_pw
+        ldd    r18, Y+c_pwd
+        add    r17, r18
+        cpi    r17, 0xf4
+        brlo    2f
+        subi    r17, 256-0x18
+2:
+        ldd    r18, Y+c_noise
+        add    r24, r18
+
+        subi    r18, 1
+        brcs    3f
+        std    Y+c_noise, r18
+3:
+        std    Y+c_pw, r17
+        std    Y+c_freq+1, r21
+        std    Y+c_freq, r20
+        std    Y+c_vol, r16
+
+        adiw    r28, c_sz
+        cpi    r28, lo8(ch+3*c_sz)
+        breq    5f
+        rjmp    play_ch
+5:
+        sts    noisevol, r24
+
+        ret
+
+loadinstr:
+        ; Inputs:
+        ;    r17    Instrument number
+        ;    Y    Channel data
+        ; Clobbers:
+        ;    Z
+
+        ldi    r30, lo8(instruments + 1)
+        ldi    r31, hi8(instruments + 1)
+        add    r30, r17
+        adc    r31, r3
+        lpm    r30, Z
+        std    Y+c_iptr, r30
+        std    Y+c_itime, r3
+        ret
+

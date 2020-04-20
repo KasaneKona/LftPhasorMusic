@@ -1,0 +1,54 @@
+Known colors:
+33/33 BLACK (global)
+AA/AA WHITE (vu)
+34/34 BLUE (rotozoom)
+88/88 LIGHT_GREY (grid)
+75/66 GOLD (grid)
+45/54 TEAL (vu)
+
+Format EVEN/ODD, each value ordered C34:C12
+
+0: -0.4300 SYNC
+1: -0.2867
+2: -0.1433 BURST-
+3:  0.0000 BLACK
+4: +0.1433 BURST+
+5: +0.2867
+6: +0.4300
+7: +0.5733
+8: +0.7167
+9: +0.8600
+A: +1.0033 WHITE
+B: +1.1467
+C: +1.2900
+D: +1.4333
+E: +1.5766
+F: +1.7200
+
+UV scale = 3/2?
+
+Cycle  Value on odd line  Value on even line  Sum  Difference
+1, 2   U+V                U-V                 +2U  +2V
+3, 4   -U-V               -U+V                -2U  -2V
+ 
+For GOLD (75/66):
+ Captured RGB: 137, 115, 33
+ Captured YUV: 0.439, -0.352, 0.133
+ Co = 0,0
+ Ce = -0.1433,+0.1433
+ Cycle  Value on odd line  Value on even line  Sum      Difference
+ 1, 2   0                  -0.1433             -0.1433  +0.1433
+ 3, 4   0                  +0.1433             +0.1433  -0.1433
+ Us = -0.1433
+ Vs = +0.1433
+ Y =  0.430
+ U = -0.215
+ V = +0.215
+ R = 0.430 + 0.163 = 0.593 = 151 -> 146, G 165
+ G = 0.430 + 0.057 - 0.083 = 0.404 = 103 -> 104, G 120
+ B = 0.430 - 0.291 = 0.139 = 35 -> 46, G 49
+ 
+ 
+For BLUE (34/34):
+ Captured RGB: 18, 8, 105
+ Captured YUV: 0.086, 0.359, -0.023
